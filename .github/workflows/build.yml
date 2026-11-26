@@ -1,0 +1,49 @@
+name: Gerar APK
+
+on:
+  push:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.11.1"
+
+      - name: Compilar APK
+        run: |
+          set -o pipefail
+          gradle assembleRelease --no-daemon --stacktrace 2>&1 | tee build.log
+
+      - name: Mostrar erros (se falhar)
+        if: failure()
+        run: grep -E "^e: |error:|What went wrong" -A2 build.log | head -40 | while IFS= read -r l; do echo "::error::$l"; done
+
+      - name: Renomear APK
+        run: cp build/outputs/apk/release/*.apk SpeedTrader.apk
+
+      - name: Guardar APK (aba Actions)
+        uses: actions/upload-artifact@v4
+        with:
+          name: SpeedTrader-APK
+          path: SpeedTrader.apk
+
+      - name: Publicar APK (aba Releases - baixe pelo celular)
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ github.run_number }}
+          name: Speed Trader v${{ github.run_number }}
+          files: SpeedTrader.apk
+          body: "Baixe o arquivo SpeedTrader.apk abaixo e instale no Android."
